@@ -26,7 +26,7 @@ function buildExcelRows(students) {
     fullName: s.fullName,
     gender: s.gender || "—",
     college: s.College?.name || "N/A",
-    cluster: s.College?.Cluster?.code || "CC10",
+    cluster: s.College?.Cluster?.code || "Unassigned",
     phoneNumber: s.phoneNumber,
     email: s.email,
     paymentStatus: s.paymentStatus,
@@ -36,31 +36,8 @@ function buildExcelRows(students) {
 
 // ─── Helper: fetch students for a cluster ────────────────────────────────────
 async function fetchStudentsForCluster(clusterId) {
-  const cluster = await Cluster.findByPk(clusterId);
-  const isCC10 = cluster && cluster.code === "CC10";
-
-  if (isCC10) {
-    return Student.findAll({
-      attributes: ["id", "fullName", "gender", "email", "phoneNumber", "paymentStatus", "createdAt"],
-      include: [
-        {
-          model: College,
-          attributes: ["id", "name", "clusterId"],
-          required: false,
-          include: [{ model: Cluster, as: "Cluster", attributes: ["code", "facilitatorName"] }],
-        },
-      ],
-      where: {
-        [Op.or]: [
-          { "$College.clusterId$": clusterId },
-          { "$College.clusterId$": null },
-          { collegeId: null },
-        ],
-      },
-      order: [["createdAt", "DESC"]],
-    });
-  }
-
+  // All clusters (including CC10 and CC11) now behave the same way:
+  // fetch students whose college belongs to this cluster.
   return Student.findAll({
     attributes: ["id", "fullName", "gender", "email", "phoneNumber", "paymentStatus", "createdAt"],
     include: [
@@ -97,7 +74,7 @@ async function listClusters(req, res, next) {
       return a.code.localeCompare(b.code);
     });
 
-    // Attach registration counts
+    // Attach registration counts (all clusters treated uniformly)
     const result = await Promise.all(
       clusters.map(async (c) => {
         const clusterCollegeIds = (c.Colleges || [])
@@ -105,23 +82,7 @@ async function listClusters(req, res, next) {
           .map((col) => col.id);
 
         let registrationCount = 0;
-        if (c.code === "CC10") {
-          registrationCount = await Student.count({
-            include: [
-              {
-                model: College,
-                required: false,
-              },
-            ],
-            where: {
-              [Op.or]: [
-                { "$College.clusterId$": c.id },
-                { "$College.clusterId$": null },
-                { collegeId: null },
-              ],
-            },
-          });
-        } else if (clusterCollegeIds.length > 0) {
+        if (clusterCollegeIds.length > 0) {
           registrationCount = await Student.count({
             include: [
               {
@@ -277,26 +238,10 @@ async function getClusterByToken(req, res, next) {
 
     if (!cluster) return res.status(403).json({ message: "Invalid or revoked access link." });
 
-    // Count registrations for this cluster
+    // Count registrations for this cluster (uniform for all clusters)
     const collegeIds = (cluster.Colleges || []).map((c) => c.id);
     let registrationCount = 0;
-    if (cluster.code === "CC10") {
-      registrationCount = await Student.count({
-        include: [
-          {
-            model: College,
-            required: false,
-          },
-        ],
-        where: {
-          [Op.or]: [
-            { "$College.clusterId$": cluster.id },
-            { "$College.clusterId$": null },
-            { collegeId: null },
-          ],
-        },
-      });
-    } else if (collegeIds.length > 0) {
+    if (collegeIds.length > 0) {
       registrationCount = await Student.count({
         include: [
           {

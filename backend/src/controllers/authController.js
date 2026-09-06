@@ -5,6 +5,29 @@ const generateToken = require("../utils/generateToken");
 const sendEmail = require("../utils/sendEmail");
 const { Op } = require("sequelize");
 
+/**
+ * Resolve the target cluster for a brand-new unknown college.
+ * Alternates between CC10 and CC11 based on how many colleges are already
+ * in those two clusters combined (student-wise round-robin).
+ * Even count → CC10, Odd count → CC11.
+ */
+async function resolveOverflowClusterId() {
+  const cc10 = await Cluster.findOne({ where: { code: "CC10" } }).catch(() => null);
+  const cc11 = await Cluster.findOne({ where: { code: "CC11" } }).catch(() => null);
+
+  // If CC11 doesn't exist yet, fall back to CC10 as before
+  if (!cc10) return null;
+  if (!cc11) return cc10.id;
+
+  // Count total colleges assigned to either CC10 or CC11
+  const totalInBoth = await College.count({
+    where: { clusterId: { [Op.in]: [cc10.id, cc11.id] } },
+  });
+
+  // Even → CC10, Odd → CC11
+  return totalInBoth % 2 === 0 ? cc10.id : cc11.id;
+}
+
 /** POST /api/auth/send-otp */
 async function sendOtp(req, res, next) {
   try {
@@ -112,37 +135,48 @@ async function registerStudent(req, res, next) {
       return res.status(400).json({ message: "This username is already taken. Please choose a different username." });
     }
 
-    // Resolve College: If customCollegeName is provided, find or create the college in DB (default to CC10)
-    const cc10Cluster = await Cluster.findOne({ where: { code: "CC10" } }).catch(() => null);
-    const defaultClusterId = cc10Cluster ? cc10Cluster.id : null;
-
+    // Resolve College
+    // For NEW (unknown) colleges: alternate assignment between CC10 and CC11
+    // using a student-wise round-robin (total colleges in both clusters as counter).
+    // Even count → CC10, Odd count → CC11.
     let finalCollegeId = collegeId;
+
     if (customCollegeName && customCollegeName.trim().length > 0) {
       const trimmedName = customCollegeName.trim();
-      const [customCollege, wasCreated] = await College.findOrCreate({
-        where: { name: trimmedName },
-        defaults: { name: trimmedName, clusterId: defaultClusterId, isPending: false },
-      });
-      if (!customCollege.clusterId && defaultClusterId) {
-        customCollege.clusterId = defaultClusterId;
-        customCollege.isPending = false;
-        await customCollege.save();
+      // Check if this college already exists
+      const existing = await College.findOne({ where: { name: trimmedName } });
+      if (existing) {
+        // College already exists — keep its current cluster assignment
+        finalCollegeId = existing.id;
+      } else {
+        // Brand-new college: resolve which cluster it goes to (CC10 or CC11)
+        const overflowClusterId = await resolveOverflowClusterId();
+        const newCollege = await College.create({
+          name: trimmedName,
+          clusterId: overflowClusterId,
+          isPending: false,
+        });
+        finalCollegeId = newCollege.id;
+        console.log(`[OVERFLOW COLLEGE] "${trimmedName}" → cluster ID ${overflowClusterId}`);
       }
-      finalCollegeId = customCollege.id;
     } else if (collegeId) {
       // If collegeId is a college name string rather than a UUID, find or create it
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(collegeId);
       if (!isUuid) {
-        const [cByName, wasCreated] = await College.findOrCreate({
-          where: { name: collegeId },
-          defaults: { name: collegeId, clusterId: defaultClusterId, isPending: false },
-        });
-        if (!cByName.clusterId && defaultClusterId) {
-          cByName.clusterId = defaultClusterId;
-          cByName.isPending = false;
-          await cByName.save();
+        const existing = await College.findOne({ where: { name: collegeId } });
+        if (existing) {
+          finalCollegeId = existing.id;
+        } else {
+          // Brand-new college by name: alternate between CC10 and CC11
+          const overflowClusterId = await resolveOverflowClusterId();
+          const newCollege = await College.create({
+            name: collegeId,
+            clusterId: overflowClusterId,
+            isPending: false,
+          });
+          finalCollegeId = newCollege.id;
+          console.log(`[OVERFLOW COLLEGE] "${collegeId}" → cluster ID ${overflowClusterId}`);
         }
-        finalCollegeId = cByName.id;
       }
     }
 

@@ -122,11 +122,27 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/50 text-center sm:text-left">
-          <p>&copy; {new Date().getFullYear()} ISKCON Youth Forum, Kolkata. All rights reserved.</p>
-          <p className="text-white/60 font-medium">
-            Festival of Independence — <span className="text-saffron">Bharat Varsha</span>
-          </p>
+        <div className="mt-10 pt-6 border-t border-white/10 space-y-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/50 text-center sm:text-left">
+            <p>&copy; {new Date().getFullYear()} ISKCON Youth Forum, Kolkata. All rights reserved.</p>
+            <p className="text-white/60 font-medium">
+              Festival of Independence — <span className="text-saffron">Bharat Varsha</span>
+            </p>
+          </div>
+          {/* Legal Links */}
+          <div className="flex items-center justify-center gap-1 text-[11px] text-white/35 flex-wrap">
+            <Link to="/privacy-policy" className="hover:text-saffron transition-colors font-semibold px-1.5 py-0.5 rounded hover:bg-white/5">
+              Privacy Policy
+            </Link>
+            <span className="text-white/20">·</span>
+            <Link to="/terms" className="hover:text-saffron transition-colors font-semibold px-1.5 py-0.5 rounded hover:bg-white/5">
+              Terms &amp; Conditions
+            </Link>
+            <span className="text-white/20">·</span>
+            <Link to="/contact" className="hover:text-saffron transition-colors font-semibold px-1.5 py-0.5 rounded hover:bg-white/5">
+              Contact Us
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

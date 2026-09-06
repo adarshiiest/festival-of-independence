@@ -446,7 +446,6 @@ export default function Register() {
                   </p>
                 )}
 
-                {/* Saffron Glowing Action Button */}
                 <button
                   type="submit"
                   disabled={submitting}
@@ -455,6 +454,18 @@ export default function Register() {
                   <span>{submitting ? "Registering…" : "Complete Registration"}</span>
                   {!submitting && <ArrowRight className="w-4 h-4" />}
                 </button>
+
+                {/* Consent / Legal Notice */}
+                <p className="text-center text-[11px] text-gray-400 leading-relaxed px-2">
+                  By submitting this form, you agree to our{" "}
+                  <Link to="/terms" className="text-saffron font-semibold hover:underline underline-offset-2">
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  and acknowledge our{" "}
+                  <Link to="/privacy-policy" className="text-saffron font-semibold hover:underline underline-offset-2">
+                    Privacy Policy
+                  </Link>.
+                </p>
 
               </form>
             </div>

@@ -16,6 +16,7 @@ import StudentDashboard from "./pages/StudentDashboard.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import ClusterDashboard from "./pages/ClusterDashboard.jsx";
 import AllRegistrationsDashboard from "./pages/AllRegistrationsDashboard.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
 
 export default function App() {
   return (
@@ -55,6 +56,9 @@ export default function App() {
           <Route path="/cluster" element={<ClusterDashboard />} />
           {/* Public token-gated all-registrations global view */}
           <Route path="/all-registrations" element={<AllRegistrationsDashboard />} />
+          {/* Legal Pages */}
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<PrivacyPolicy />} />
         </Routes>
       </main>
       <Footer />
