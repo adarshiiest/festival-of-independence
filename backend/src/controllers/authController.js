@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { Student, Admin, OtpVerification, College, Cluster } = require("../models");
+const { Student, Admin, OtpVerification, College, Cluster, AppSetting } = require("../models");
 const generateToken = require("../utils/generateToken");
 const sendEmail = require("../utils/sendEmail");
 const { Op } = require("sequelize");
@@ -110,6 +110,16 @@ async function verifyOtp(req, res, next) {
 /** POST /api/auth/student/register */
 async function registerStudent(req, res, next) {
   try {
+    // --- Registration Gate Check ---
+    const registrationSetting = await AppSetting.findByPk("registrationOpen");
+    const registrationOpen = registrationSetting ? registrationSetting.value === "true" : true;
+    if (!registrationOpen) {
+      return res.status(403).json({
+        message: "Registration is currently closed. Please check back later or contact the organizers.",
+        registrationClosed: true,
+      });
+    }
+
     const { fullName, collegeId, customCollegeName, gender, phoneNumber, address, email, username, password } = req.body;
 
     if (!fullName || (!collegeId && !customCollegeName) || !phoneNumber || !address || !email || !username || !password) {
@@ -467,6 +477,64 @@ async function resetPassword(req, res, next) {
   }
 }
 
+/**
+ * GET /api/auth/registration-status
+ * Public endpoint: returns whether student registration is currently open.
+ */
+async function registrationStatus(req, res, next) {
+  try {
+    const setting = await AppSetting.findByPk("registrationOpen");
+    const registrationOpen = setting ? setting.value === "true" : true;
+    res.json({ registrationOpen });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/verify-identity
+ * Password reset via email + phone number match instead of OTP email.
+ * Body: { email, phoneNumber }
+ * If both match a DB record, generates a reset token and returns it directly.
+ */
+async function verifyIdentity(req, res, next) {
+  try {
+    const { email, phoneNumber } = req.body;
+    if (!email || !phoneNumber) {
+      return res.status(400).json({ message: "Email and phone number are required." });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phoneNumber.trim();
+
+    // Only students have a phoneNumber field — this reset flow is student-only.
+    // Admins should use the standard /forgot-password (email link) route instead.
+    const user = await Student.findOne({ where: { email: normalizedEmail } });
+
+    if (!user || user.phoneNumber?.trim() !== normalizedPhone) {
+      return res.status(400).json({
+        message: "No account found with that email and phone number combination. Please check your details.",
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetExpires;
+    await user.save();
+
+    // Return the token directly — frontend will redirect to /reset-password?token=...
+    res.json({
+      message: "Identity verified successfully! Redirecting you to reset your password.",
+      resetToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   sendOtp,
   verifyOtp,
@@ -476,4 +544,6 @@ module.exports = {
   verifyAdminOtp,
   forgotPassword,
   resetPassword,
+  verifyIdentity,
+  registrationStatus,
 };

@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const { Student, Admin, College, Payment, Notification, EventRegistration } = require("../models");
+const { Student, Admin, College, Payment, Notification, EventRegistration, AppSetting } = require("../models");
 const exportToExcel = require("../utils/excelExport");
 
 /** GET /api/admin/students?college=&paymentStatus=&search=&date=&startDate=&endDate=&gender= */
@@ -322,6 +322,37 @@ async function deleteAdmin(req, res, next) {
   }
 }
 
+/** GET /api/admin/settings — get site-wide settings */
+async function getSettings(req, res, next) {
+  try {
+    const registrationSetting = await AppSetting.findByPk("registrationOpen");
+    const registrationOpen = registrationSetting ? registrationSetting.value === "true" : true;
+    res.json({ registrationOpen });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PUT /api/admin/settings — update site-wide settings (SuperAdmin only) */
+async function updateSettings(req, res, next) {
+  try {
+    if (req.user.adminRole !== "SuperAdmin") {
+      return res.status(403).json({ message: "Only Super Admins can change site settings." });
+    }
+
+    const { registrationOpen } = req.body;
+    if (typeof registrationOpen !== "boolean") {
+      return res.status(400).json({ message: "registrationOpen must be a boolean." });
+    }
+
+    await AppSetting.upsert({ key: "registrationOpen", value: String(registrationOpen) });
+
+    res.json({ registrationOpen, message: `Student registration is now ${registrationOpen ? "open" : "closed"}.` });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listStudents,
   deleteStudent,
@@ -334,4 +365,6 @@ module.exports = {
   createAdmin,
   updateAdmin,
   deleteAdmin,
+  getSettings,
+  updateSettings,
 };

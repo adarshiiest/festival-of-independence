@@ -13,6 +13,8 @@ const {
   createAdmin,
   updateAdmin,
   deleteAdmin,
+  getSettings,
+  updateSettings,
 } = require("../controllers/adminController");
 
 router.use(protect, requireRole("admin"));
@@ -30,5 +32,8 @@ router.get("/team", listAdmins);
 router.post("/team", requireSuperAdmin, createAdmin);
 router.put("/team/:id", requireSuperAdmin, updateAdmin);
 router.delete("/team/:id", requireSuperAdmin, deleteAdmin);
+
+router.get("/settings", getSettings);
+router.put("/settings", requireSuperAdmin, updateSettings);
 
 module.exports = router;

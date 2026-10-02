@@ -80,6 +80,8 @@ export default function Register() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  const [registrationOpen, setRegistrationOpen] = useState(null); // null = loading
+
   const [colleges, setColleges] = useState([]);
   const [form, setForm] = useState({
     fullName: "",
@@ -101,6 +103,12 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // Check if registration is open
+    api
+      .get("/auth/registration-status")
+      .then((res) => setRegistrationOpen(res.data.registrationOpen !== false))
+      .catch(() => setRegistrationOpen(true)); // default open if request fails
+
     api
       .get("/colleges")
       .then((res) => {
@@ -169,6 +177,38 @@ export default function Register() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Registration closed gate
+  if (registrationOpen === false) {
+    return (
+      <div className="w-full flex-1 flex flex-col items-center justify-center bg-[#F4F4F8] p-4 font-sans">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-red-600 to-rose-600 px-8 py-8 text-center">
+            <div className="text-4xl mb-2">🔒</div>
+            <h1 className="text-2xl font-extrabold text-white mb-1">Registration Closed</h1>
+            <p className="text-sm text-white/80 font-medium">The registration window has been temporarily closed.</p>
+          </div>
+          <div className="px-8 py-8 text-center space-y-4">
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Student registrations for the <strong>Festival of Independence</strong> are currently paused.
+              Please check back later or contact the organizers for more information.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+              <p className="text-xs text-amber-700 font-semibold">
+                📣 Already registered? <Link to="/login" className="underline hover:text-amber-900">Login to your dashboard →</Link>
+              </p>
+            </div>
+            <Link
+              to="/"
+              className="inline-block mt-2 bg-navy text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-saffron hover:text-navy transition-all"
+            >
+              ← Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

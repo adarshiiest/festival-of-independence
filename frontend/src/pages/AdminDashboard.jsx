@@ -35,6 +35,9 @@ import {
   RotateCw,
   AlertCircle,
   Layers,
+  Settings,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -112,6 +115,11 @@ export default function AdminDashboard() {
   const [globalToken, setGlobalToken] = useState("");
   const [rotatingGlobalToken, setRotatingGlobalToken] = useState(false);
 
+  // Settings state
+  const [settingsRegistrationOpen, setSettingsRegistrationOpen] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
   // Admin Profile Form State
   const [profileForm, setProfileForm] = useState({
     name: user?.name || "IYF Kolkata Admin",
@@ -135,6 +143,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchColleges();
+    fetchSettings();
   }, []);
 
   useEffect(() => {
@@ -145,6 +154,7 @@ export default function AdminDashboard() {
     if (activeTab === "team") fetchAdminTeam();
     if (activeTab === "messages") fetchContactMessages();
     if (activeTab === "clusters") { fetchClusters(); fetchPendingColleges(); fetchUnassignedColleges(); }
+    if (activeTab === "settings") fetchSettings();
   }, [activeTab, paymentStatus, selectedCollege, selectedDate, selectedGender]);
 
 
@@ -157,6 +167,37 @@ export default function AdminDashboard() {
       console.error(err);
     } finally {
       setLoadingContactMsgs(false);
+    }
+  }
+
+  async function fetchSettings() {
+    setLoadingSettings(true);
+    try {
+      const res = await api.get("/admin/settings");
+      setSettingsRegistrationOpen(res.data.registrationOpen !== false);
+    } catch (err) {
+      console.error("Failed to load settings", err);
+    } finally {
+      setLoadingSettings(false);
+    }
+  }
+
+  async function handleToggleRegistration(newValue) {
+    if (!isSuperAdmin) {
+      toast.error("Only Super Admins can change registration settings.");
+      return;
+    }
+    const action = newValue ? "open" : "close";
+    if (!confirm(`Are you sure you want to ${action} student registrations?`)) return;
+    setSavingSettings(true);
+    try {
+      const res = await api.put("/admin/settings", { registrationOpen: newValue });
+      setSettingsRegistrationOpen(res.data.registrationOpen);
+      toast.success(res.data.message || `Registration is now ${newValue ? "open" : "closed"}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update settings.");
+    } finally {
+      setSavingSettings(false);
     }
   }
 
@@ -743,6 +784,18 @@ export default function AdminDashboard() {
                   }`}
                 >
                   <User className="w-4 h-4 text-saffron" /> Admin Profile Info
+                </button>
+
+                {/* Settings — SuperAdmin only */}
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all ${
+                    activeTab === "settings"
+                      ? "bg-amber-100/70 text-saffron shadow-2xs"
+                      : "text-gray-600 hover:bg-gray-100/80"
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-saffron" /> Site Settings
                 </button>
               </nav>
 
@@ -1870,6 +1923,85 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: SITE SETTINGS */}
+            {activeTab === "settings" && (
+              <div className="space-y-6">
+                <div className="border-b border-gray-100 pb-4">
+                  <h2 className="text-xl font-extrabold tracking-tight text-navy">Site Settings</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Manage site-wide settings. Changes take effect immediately.</p>
+                </div>
+
+                {!isSuperAdmin && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-700 font-medium">
+                    ⚠️ These settings can only be changed by a Super Admin. You have view-only access.
+                  </div>
+                )}
+
+                {/* Registration Toggle Card */}
+                <div className={`rounded-2xl border-2 p-6 transition-all ${
+                  settingsRegistrationOpen
+                    ? "border-green-200 bg-green-50/40"
+                    : "border-red-200 bg-red-50/40"
+                }`}>
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      settingsRegistrationOpen ? "bg-green-100" : "bg-red-100"
+                    }`}>
+                      <span className="text-2xl">{settingsRegistrationOpen ? "🟢" : "🔴"}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                          <h3 className="text-base font-extrabold text-navy mb-0.5">Student Registration</h3>
+                          <p className="text-xs text-gray-500">
+                            {settingsRegistrationOpen
+                              ? "Registration is currently OPEN. New students can register."
+                              : "Registration is currently CLOSED. No new students can register."}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                            settingsRegistrationOpen
+                              ? "bg-green-100 text-green-700 border-green-300"
+                              : "bg-red-100 text-red-700 border-red-300"
+                          }`}>
+                            {settingsRegistrationOpen ? "OPEN" : "CLOSED"}
+                          </span>
+                          {isSuperAdmin && (
+                            <button
+                              id="toggle-registration-btn"
+                              disabled={savingSettings || loadingSettings}
+                              onClick={() => handleToggleRegistration(!settingsRegistrationOpen)}
+                              title={settingsRegistrationOpen ? "Stop Registration" : "Open Registration"}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-sm ${
+                                settingsRegistrationOpen
+                                  ? "bg-red-500 hover:bg-red-600 text-white"
+                                  : "bg-green-500 hover:bg-green-600 text-white"
+                              }`}
+                            >
+                              {settingsRegistrationOpen ? (
+                                <><ToggleRight className="w-4 h-4" /> Stop Registration</>
+                              ) : (
+                                <><ToggleLeft className="w-4 h-4" /> Open Registration</>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 bg-white/80 rounded-xl border border-gray-100 px-4 py-3 text-xs text-gray-600 space-y-1.5">
+                        <p className="font-bold text-navy text-[11px] uppercase tracking-wider mb-2">What this does:</p>
+                        <p>✅ <strong>Open:</strong> Students can visit /register and complete registration normally.</p>
+                        <p>🔒 <strong>Closed:</strong> The /register page shows a &quot;Registration Closed&quot; notice. The API also blocks any direct registration attempts.</p>
+                        <p className="text-amber-600 font-medium mt-2">⚠️ Only Super Admins can change this setting.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
 

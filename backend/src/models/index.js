@@ -10,6 +10,7 @@ const OtpVerification = require("./OtpVerification");
 const Notification = require("./Notification");
 const EventRegistration = require("./EventRegistration");
 const Testimonial = require("./Testimonial");
+const AppSetting = require("./AppSetting");
 
 // ----- Associations -----
 
@@ -45,4 +46,5 @@ module.exports = {
   Notification,
   EventRegistration,
   Testimonial,
+  AppSetting,
 };
